@@ -1,0 +1,31 @@
+app:
+  title: "Gestion des Congés"
+  version: "3.0 - Pro"
+
+db:
+  filename: "conges_v3.db"
+  certificates_dir: "certificats"
+
+# Paramètres des congés
+conges:
+  maternite_duree: 98
+  paternite_duree: 15
+  types_decompte_solde:
+    - "Congé annuel"
+  
+  holidays_country: 'MA'
+
+ui:
+  grades:
+    - "Professeur"
+    - "PA"
+    - "Infirmier"
+    - "Technicien de santé"
+    - "Administrateur"
+    - "Technicien"
+  types_conge:
+    - "Congé annuel"
+    - "Congé exceptionnel"
+    - "Congé de maladie"
+    - "Congé de maternité"
+    - "Congé de paternité"
