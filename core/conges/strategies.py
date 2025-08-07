@@ -98,19 +98,27 @@ class CongeMaterniteStrategy(CongeCalendaireStrategy):
     def __init__(self):
         super().__init__()
         self.days_value = str(CONFIG['conges']['maternite_duree'])
-        self.days_state = "readonly"
-        self.end_date_state = "readonly"
+        # ================== MODIFICATION APPLIQUÉE ICI ==================
+        # Les champs sont maintenant modifiables par l'utilisateur.
+        self.days_state = "normal"
+        self.end_date_state = "normal"
+        # ================================================================
 
     def calculate_days(self, start_date, end_date, holidays_set):
-        return CONFIG['conges']['maternite_duree']
+        # On utilise le calcul de la classe parente (calendaire) pour rester flexible.
+        return super().calculate_days(start_date, end_date, holidays_set)
 
 class CongePaterniteStrategy(CongeCalendaireStrategy):
     """Stratégie pour le congé paternité, avec une durée fixe chargée depuis la configuration."""
     def __init__(self):
         super().__init__()
         self.days_value = str(CONFIG['conges']['paternite_duree'])
-        self.days_state = "readonly"
-        self.end_date_state = "readonly"
+        # ================== MODIFICATION APPLIQUÉE ICI ==================
+        # Les champs sont maintenant modifiables par l'utilisateur.
+        self.days_state = "normal"
+        self.end_date_state = "normal"
+        # ================================================================
 
     def calculate_days(self, start_date, end_date, holidays_set):
-        return CONFIG['conges']['paternite_duree']
+        # On utilise le calcul de la classe parente (calendaire) pour rester flexible.
+        return super().calculate_days(start_date, end_date, holidays_set)

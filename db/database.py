@@ -85,7 +85,8 @@ class DatabaseManager:
                                   interim_id INTEGER, 
                                   date_debut TEXT NOT NULL, 
                                   date_fin TEXT NOT NULL, 
-                                  jours_pris INTEGER NOT NULL CHECK(jours_pris >= 0), 
+                                  jours_pris INTEGER NOT NULL CHECK(jours_pris >= 0),
+                                  statut TEXT NOT NULL DEFAULT 'Actif',
                                   FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE, 
                                   FOREIGN KEY (interim_id) REFERENCES agents(id) ON DELETE SET NULL)""")
             self.execute_query("""CREATE TABLE IF NOT EXISTS jours_feries_personnalises (
@@ -225,7 +226,7 @@ class DatabaseManager:
         return Agent.from_db_row(row) if row else None
         
     def get_conges(self, agent_id=None):
-        base_query = "SELECT id, agent_id, type_conge, justif, interim_id, date_debut, date_fin, jours_pris FROM conges"
+        base_query = "SELECT id, agent_id, type_conge, justif, interim_id, date_debut, date_fin, jours_pris, statut FROM conges"
         params = ()
         if agent_id:
             base_query += " WHERE agent_id=? ORDER BY date_debut DESC"
@@ -237,10 +238,7 @@ class DatabaseManager:
         return [Conge.from_db_row(row) for row in rows if row]
 
     def get_conge_by_id(self, conge_id):
-        """
-        Récupère un seul congé par son ID et le retourne comme un objet Conge.
-        """
-        query = "SELECT id, agent_id, type_conge, justif, interim_id, date_debut, date_fin, jours_pris FROM conges WHERE id = ?"
+        query = "SELECT id, agent_id, type_conge, justif, interim_id, date_debut, date_fin, jours_pris, statut FROM conges WHERE id = ?"
         row = self.execute_query(query, (conge_id,), fetch="one")
         return Conge.from_db_row(row) if row else None
 
@@ -280,7 +278,7 @@ class DatabaseManager:
         return self.execute_query("SELECT * FROM certificats_medicaux WHERE conge_id = ?", (conge_id,), fetch="one")
 
     def get_overlapping_leaves(self, agent_id, date_debut, date_fin, conge_id_exclu=None):
-        query = "SELECT * FROM conges WHERE agent_id=? AND date_fin >= ? AND date_debut <= ?"
+        query = "SELECT id, agent_id, type_conge, justif, interim_id, date_debut, date_fin, jours_pris, statut FROM conges WHERE agent_id=? AND date_fin >= ? AND date_debut <= ? AND statut = 'Actif'"
         params = [agent_id, date_debut.strftime('%Y-%m-%d'), date_fin.strftime('%Y-%m-%d')]
         if conge_id_exclu:
             query += " AND id != ?"

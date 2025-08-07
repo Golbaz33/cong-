@@ -111,7 +111,10 @@ class MainWindow(tk.Tk):
         self.list_conges = ttk.Treeview(conges_frame, columns=cols_conges, show="headings", selectmode="browse")
         for col in cols_conges: self.list_conges.heading(col, text=col, command=lambda c=col: treeview_sort_column(self.list_conges, c, False))
         self.list_conges.column("CongeID", width=0, stretch=False); self.list_conges.column("Certificat", width=80, anchor="center"); self.list_conges.column("Type", width=120); self.list_conges.column("Début", width=90, anchor="center"); self.list_conges.column("Fin", width=90, anchor="center"); self.list_conges.column("Jours", width=50, anchor="center"); self.list_conges.column("Intérimaire", width=150)
-        self.list_conges.pack(fill=tk.BOTH, expand=True, padx=5, pady=5); self.list_conges.tag_configure("summary", background="#e6f2ff", font=("Helvetica", 10, "bold")); self.list_conges.bind("<Double-1>", lambda e: self.on_conge_double_click())
+        self.list_conges.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.list_conges.tag_configure("summary", background="#e6f2ff", font=("Helvetica", 10, "bold"))
+        self.list_conges.tag_configure("annule", foreground="grey", font=('Helvetica', 10, 'overstrike'))
+        self.list_conges.bind("<Double-1>", lambda e: self.on_conge_double_click())
         
         btn_frame_conges = ttk.Frame(conges_frame); btn_frame_conges.pack(fill=tk.X, padx=5, pady=(0, 5));
         ttk.Button(btn_frame_conges, text="Ajouter", command=self.add_conge_ui).pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
@@ -139,7 +142,11 @@ class MainWindow(tk.Tk):
         selection = self.list_conges.selection()
         if not selection: return None
         item = self.list_conges.item(selection[0])
-        return int(item["values"][0]) if "summary" not in item["tags"] and item["values"] else None
+        
+        if "annule" in item["tags"] or "summary" in item["tags"]:
+            return None
+            
+        return int(item["values"][0]) if item["values"] else None
 
     def add_agent_ui(self): AgentForm(self, self.manager)
     def modify_selected_agent(self):
@@ -194,9 +201,7 @@ class MainWindow(tk.Tk):
         if selected_item_id:
             self.list_agents.selection_set(selected_item_id)
             self.list_agents.focus(selected_item_id)
-            self.on_agent_select()
-        else:
-            self.list_conges.delete(*self.list_conges.get_children())
+        self.on_agent_select()
         
         self.page_label.config(text=f"Page {self.current_page} / {self.total_pages}")
         self.prev_button.config(state="normal" if self.current_page > 1 else "disabled")
@@ -212,16 +217,12 @@ class MainWindow(tk.Tk):
         for c in conges_data:
             if filtre != "Tous" and c.type_conge != filtre: continue
             try:
-                # ==================== CORRECTION APPLIQUÉE ICI ====================
-                # c.date_debut est déjà un objet datetime, pas besoin de parser.
                 conges_par_annee[c.date_debut.year].append(c)
-                # =================================================================
             except AttributeError:
-                # Sécurité au cas où un objet date ne serait pas valide
                 logging.warning(f"Date invalide ou nulle pour congé ID {c.id}")
         
         for annee in sorted(conges_par_annee.keys(), reverse=True):
-            total_jours = sum(c.jours_pris for c in conges_par_annee[annee] if c.type_conge == 'Congé annuel')
+            total_jours = sum(c.jours_pris for c in conges_par_annee[annee] if c.type_conge == 'Congé annuel' and c.statut == 'Actif')
             summary_id = self.list_conges.insert("", "end", values=("", "", f"📅 ANNÉE {annee}", "", "", total_jours, f"{total_jours} jours pris"), tags=("summary",), open=True)
             
             for conge in conges_par_annee[annee]:
@@ -235,26 +236,32 @@ class MainWindow(tk.Tk):
                     interim = self.manager.get_agent_by_id(conge.interim_id)
                     interim_info = f"{interim.nom} {interim.prenom}" if interim else "Agent Supprimé"
                 
+                tags_a_appliquer = ('annule',) if conge.statut == 'Annulé' else ()
+                
                 self.list_conges.insert(summary_id, "end", values=(
                     conge.id, cert_status, conge.type_conge, 
                     format_date_for_display(conge.date_debut), 
                     format_date_for_display(conge.date_fin), 
                     conge.jours_pris, conge.justif or "", interim_info
-                ))
+                ), tags=tags_a_appliquer)
 
     def refresh_stats(self):
         self.text_stats.config(state=tk.NORMAL)
         self.text_stats.delete("1.0", tk.END)
         try:
-            conges = self.manager.db.get_conges()
+            all_conges = self.manager.db.get_conges()
             nb_agents = self.manager.db.get_agents_count()
-            total_jours_pris = sum(c.jours_pris for c in conges)
+
+            active_conges = [c for c in all_conges if c.statut == 'Actif']
+            total_jours_pris = sum(c.jours_pris for c in active_conges)
+            
             self.text_stats.insert(tk.END, f"{'Nombre total d\'agents':<25}: {nb_agents}\n")
-            self.text_stats.insert(tk.END, f"{'Total des jours de congés':<25}: {total_jours_pris}\n\n")
-            self.text_stats.insert(tk.END, "Répartition par type de congé:\n")
-            if conges:
-                for type_conge, count in Counter(c.type_conge for c in conges).most_common():
-                    self.text_stats.insert(tk.END, f"  - {type_conge:<22}: {count} ({(count / len(conges)) * 100:.1f}%)\n")
+            self.text_stats.insert(tk.END, f"{'Total des jours de congés actifs':<25}: {total_jours_pris}\n\n")
+            self.text_stats.insert(tk.END, "Répartition par type de congé (actifs):\n")
+            
+            if active_conges:
+                for type_conge, count in Counter(c.type_conge for c in active_conges).most_common():
+                    self.text_stats.insert(tk.END, f"  - {type_conge:<22}: {count} ({(count / len(active_conges)) * 100:.1f}%)\n")
         except sqlite3.Error as e:
             self.text_stats.insert(tk.END, f"Erreur de lecture des statistiques: {e}")
         finally:
@@ -281,8 +288,10 @@ class MainWindow(tk.Tk):
         self.current_page = 1; self.refresh_agents_list()
     def on_agent_select(self, event=None):
         agent_id = self.get_selected_agent_id()
-        if agent_id: self.refresh_conges_list(agent_id)
-        else: self.list_conges.delete(*self.list_conges.get_children())
+        if agent_id:
+            self.refresh_conges_list(agent_id)
+        else:
+            self.list_conges.delete(*self.list_conges.get_children())
     def prev_page(self):
         if self.current_page > 1: self.current_page -= 1; self.refresh_agents_list(self.get_selected_agent_id())
     def next_page(self):

@@ -119,7 +119,12 @@ class CongeForm(tk.Toplevel):
         if not type_conge: return
         self.current_strategy = self.STRATEGIES[type_conge]
         self.current_strategy.configure_ui(self)
-        self.after(100, self._update_days_from_dates)
+        
+        # ================== MODIFICATION APPLIQUÉE ICI ==================
+        # On déclenche le calcul de la date de fin à partir de la durée,
+        # ce qui est plus logique pour les congés à durée prédéfinie.
+        self.after(100, self._update_end_date_from_days)
+        # ================================================================
 
     def _update_end_date_from_days(self):
         try:
@@ -129,10 +134,13 @@ class CongeForm(tk.Toplevel):
             holidays_set = get_holidays_set_for_period(self.db, start_date.year, start_date.year + 2)
             end_date = self.current_strategy.calculate_end_date(start_date, days, holidays_set)
             
+            # On réactive le champ temporairement pour pouvoir le modifier
+            current_state = self.end_date_entry.cget('state')
             self.end_date_entry.config(state="normal")
             self.end_date_entry.delete(0, tk.END)
             self.end_date_entry.insert(0, end_date.strftime("%d/%m/%Y"))
-            self.end_date_entry.config(state=self.current_strategy.end_date_state)
+            # On remet le champ dans son état original (défini par la stratégie)
+            self.end_date_entry.config(state=current_state)
         except (ValueError, TypeError): return
 
     def _update_days_from_dates(self):
@@ -146,9 +154,12 @@ class CongeForm(tk.Toplevel):
             holidays_set = get_holidays_set_for_period(self.db, start_date.year, end_date.year)
             days = self.current_strategy.calculate_days(start_date, end_date, holidays_set)
             
+            # On réactive le champ temporairement pour pouvoir le modifier
+            current_state = self.days_spinbox.cget('state')
             self.days_spinbox.config(state="normal")
             self.days_var.set(str(days))
-            self.days_spinbox.config(state=self.current_strategy.days_state)
+            # On remet le champ dans son état original (défini par la stratégie)
+            self.days_spinbox.config(state=current_state)
         except (ValueError, TypeError): self.days_var.set("0")
 
     def _populate_data(self):
@@ -170,11 +181,13 @@ class CongeForm(tk.Toplevel):
 
     def _load_interim_agents(self):
         agents = self.manager.db.get_agents(exclude_id=self.agent_id)
-        self.interim_agents = {f"{a[1]} {a[2]} (PPR: {a[3]})": a[0] for a in agents}
+        self.interim_agents = {f"{a.nom} {a.prenom} (PPR: {a.ppr})": a.id for a in agents}
         self.interim_combo['values'] = [""] + sorted(list(self.interim_agents.keys()))
 
     def _attach_certificate(self):
-        filepath = filedialog.askopenfilename(parent=self, filetypes=CONFIG['CERTIFICAT_FILE_TYPES'])
+        # La configuration des types de fichiers est maintenant lue depuis config.yaml
+        filetypes = CONFIG.get('ui', {}).get('certificat_file_types', [("Tous les fichiers", "*.*")])
+        filepath = filedialog.askopenfilename(parent=self, filetypes=filetypes)
         if filepath:
             self.cert_path_var.set(filepath)
             self.current_strategy._update_certificat_display(self)
@@ -185,24 +198,27 @@ class CongeForm(tk.Toplevel):
             self.current_strategy._update_certificat_display(self)
     
     def _on_validate(self):
-        form_data = {
-            'agent_id': self.agent_id,
-            'agent_ppr': self.agent_ppr,
-            'conge_id': self.conge_id,
-            'type_conge': self.type_var.get(),
-            'date_debut': self.start_date_entry.get(),
-            'date_fin': self.end_date_entry.get(),
-            'jours_pris': int(self.days_var.get()),
-            'justif': self.justif_entry.get().strip(),
-            'interim_id': self.interim_agents.get(self.interim_var.get()),
-            'cert_path': self.cert_path_var.get(),
-            'original_cert_path': self.original_cert_path,
-        }
-        
-        success = self.manager.handle_conge_submission(form_data, self.is_modification)
-        
-        if success:
-            message = "Congé modifié avec succès." if self.is_modification else "Congé ajouté avec succès."
-            self.parent.set_status(message)
-            self.parent.refresh_all(self.agent_id)
-            self.destroy()
+        try:
+            form_data = {
+                'agent_id': self.agent_id,
+                'agent_ppr': self.agent_ppr,
+                'conge_id': self.conge_id,
+                'type_conge': self.type_var.get(),
+                'date_debut': self.start_date_entry.get(),
+                'date_fin': self.end_date_entry.get(),
+                'jours_pris': int(self.days_var.get()),
+                'justif': self.justif_entry.get().strip(),
+                'interim_id': self.interim_agents.get(self.interim_var.get()),
+                'cert_path': self.cert_path_var.get(),
+                'original_cert_path': self.original_cert_path,
+            }
+            
+            success = self.manager.handle_conge_submission(form_data, self.is_modification)
+            
+            if success:
+                message = "Congé modifié avec succès." if self.is_modification else "Congé ajouté avec succès."
+                self.parent.set_status(message)
+                self.parent.refresh_all(self.agent_id)
+                self.destroy()
+        except Exception as e:
+            messagebox.showerror("Erreur de Validation", str(e), parent=self)

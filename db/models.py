@@ -23,7 +23,7 @@ class Agent:
 
 class Conge:
     """Représente un congé avec ses attributs."""
-    def __init__(self, id, agent_id, type_conge, justif, interim_id, date_debut, date_fin, jours_pris):
+    def __init__(self, id, agent_id, type_conge, justif, interim_id, date_debut, date_fin, jours_pris, statut='Actif'):
         self.id = id
         self.agent_id = agent_id
         self.type_conge = type_conge
@@ -32,6 +32,7 @@ class Conge:
         self.date_debut = validate_date(date_debut) # Convertit la chaîne en objet datetime
         self.date_fin = validate_date(date_fin)     # Convertit la chaîne en objet datetime
         self.jours_pris = jours_pris
+        self.statut = statut
 
     def __str__(self):
         debut_str = self.date_debut.strftime('%d/%m/%Y') if self.date_debut else 'N/A'
@@ -43,7 +44,7 @@ class Conge:
         """Crée une instance de Conge à partir d'une ligne de la base de données."""
         if not row:
             return None
-        # Notez que l'ordre des colonnes doit correspondre à votre requête SELECT * FROM conges
+        # L'ordre des colonnes doit correspondre à la requête SELECT
         return cls(
             id=row[0], 
             agent_id=row[1], 
@@ -52,5 +53,6 @@ class Conge:
             interim_id=row[4], 
             date_debut=row[5], 
             date_fin=row[6], 
-            jours_pris=row[7]
+            jours_pris=row[7],
+            statut=row[8]
         )
