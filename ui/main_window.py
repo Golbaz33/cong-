@@ -143,7 +143,7 @@ class MainWindow(tk.Tk):
         if not selection: return None
         item = self.list_conges.item(selection[0])
         
-        if "annule" in item["tags"] or "summary" in item["tags"]:
+        if "summary" in item["tags"]:
             return None
             
         return int(item["values"][0]) if item["values"] else None
