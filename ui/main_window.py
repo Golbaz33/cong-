@@ -174,7 +174,8 @@ class MainWindow(tk.Tk):
         elif not conge_id: messagebox.showwarning("Aucune sélection", "Veuillez sélectionner un congé à supprimer.")
     def export_agents(self): export_agents_to_excel(self, self.db)
     def export_conges(self): export_all_conges_to_excel(self, self.db)
-    def import_agents(self): import_agents_from_excel(self, self.db, on_success=self.refresh_all)
+    def import_agents(self): 
+        import_agents_from_excel(self, self.db)
     def open_holidays_manager(self): HolidaysManagerWindow(self, self.db)
     def open_justificatifs_suivi(self): JustificatifsWindow(self, self.db)
 
