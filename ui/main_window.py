@@ -1,4 +1,4 @@
-# ui/main_window.py
+# Fichier : ui/main_window.py (Version finale avec le tri et le format de date corrigés)
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -19,6 +19,19 @@ from ui.widgets.date_picker import DatePickerWindow
 from utils.file_utils import export_agents_to_excel, export_all_conges_to_excel, import_agents_from_excel
 from utils.date_utils import format_date_for_display
 from utils.config_loader import CONFIG
+
+# --- MODIFICATION N°1 : Ajout d'une fonction de formatage courte ---
+def format_date_for_display_short(date_obj):
+    """Convertit un objet date en format affichable court (JJ/MM/AA)."""
+    if not date_obj: return ""
+    try:
+        # Si c'est déjà un objet datetime, on le formate directement
+        if hasattr(date_obj, 'strftime'):
+            return date_obj.strftime("%d/%m/%y")
+        # Sinon, on essaie de le parser depuis une chaîne
+        return parser.parse(str(date_obj)).strftime("%d/%m/%y")
+    except (ValueError, TypeError):
+        return str(date_obj)
 
 def treeview_sort_column(tv, col, reverse):
     l = [(tv.set(k, col), k) for k in tv.get_children('')]
@@ -226,7 +239,9 @@ class MainWindow(tk.Tk):
             total_jours = sum(c.jours_pris for c in conges_par_annee[annee] if c.type_conge == 'Congé annuel' and c.statut == 'Actif')
             summary_id = self.list_conges.insert("", "end", values=("", "", f"📅 ANNÉE {annee}", "", "", total_jours, f"{total_jours} jours pris"), tags=("summary",), open=True)
             
-            for conge in conges_par_annee[annee]:
+            # --- MODIFICATION N°2 : Tri des congés par date de début ---
+            # On parcourt les congés de l'année triés par date
+            for conge in sorted(conges_par_annee[annee], key=lambda c: c.date_debut):
                 cert_status = ""
                 if conge.type_conge == 'Congé de maladie':
                     cert = self.db.get_certificat_for_conge(conge.id)
@@ -239,10 +254,11 @@ class MainWindow(tk.Tk):
                 
                 tags_a_appliquer = ('annule',) if conge.statut == 'Annulé' else ()
                 
+                # --- MODIFICATION N°1 (suite) : Utilisation de la nouvelle fonction ---
                 self.list_conges.insert(summary_id, "end", values=(
                     conge.id, cert_status, conge.type_conge, 
-                    format_date_for_display(conge.date_debut), 
-                    format_date_for_display(conge.date_fin), 
+                    format_date_for_display_short(conge.date_debut), 
+                    format_date_for_display_short(conge.date_fin), 
                     conge.jours_pris, conge.justif or "", interim_info
                 ), tags=tags_a_appliquer)
 
